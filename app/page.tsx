@@ -1,94 +1,81 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+"use client";
+import { SettingsSheet } from "@/components/SettingsSheet";
+import { getCoordinates } from "@/lib/geo";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePrayerTimes } from "./hooks/usePrayerTimes";
+import { NextPrayer } from "./components/NextPrayer";
+import { PrayerGrid } from "./components/PrayerGrid";
 
-export default function Home() {
+export default function Page() {
+  const [method, setMethod] = useState<number>(
+    parseInt(process.env.NEXT_PUBLIC_DEFAULT_METHOD ?? "2", 10)
+  );
+  const [school, setSchool] = useState<0 | 1>(
+    parseInt(process.env.NEXT_PUBLIC_DEFAULT_SCHOOL ?? "0", 10) as 0 | 1
+  );
+
+  const [coords, setCoords] = useState<{
+    lat: number;
+    lon: number;
+    source: "geo" | "fallback";
+  } | null>(null);
+  const { data, loading, error, refresh } = usePrayerTimes({
+    coords,
+    method,
+    school,
+  });
+
+  useEffect(() => {
+    (async () => setCoords(await getCoordinates()))();
+  }, []);
+
+  const rows = useMemo(() => data?.rows ?? [], [data]);
+  const next = useMemo(() => data?.nextPrayer, [data]);
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const onPlayAdhan = () => {
+    if (!audioRef.current) audioRef.current = new Audio("/adhan.mp3");
+    audioRef.current.currentTime = 0;
+    audioRef.current.play();
+  };
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol>
-          <li>
-            Get started by editing <code>app/page.tsx</code>.
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={styles.secondary}
-          >
-            Read our docs
-          </a>
+    <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight">
+            Adhan — Prayer Times
+          </h1>
+          {data?.meta && (
+            <p className="text-sm text-slate-600 mt-1">
+              <span className="mr-2">{data.meta.readable}</span>
+              <span className="opacity-80">• Hijri: {data.meta.hijri}</span>
+            </p>
+          )}
+          {data?.meta?.timezone && (
+            <p className="text-xs text-slate-500 mt-1">
+              Timezone: {data.meta.timezone}
+            </p>
+          )}
         </div>
-      </main>
-      <footer className={styles.footer}>
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+        <SettingsSheet
+          method={method}
+          school={school}
+          coords={coords}
+          onChangeMethod={setMethod}
+          onChangeSchool={setSchool}
+          onRefresh={refresh}
+        />
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 mt-6">
+        <NextPrayer next={next} onPlayAdhan={onPlayAdhan} />
+        <PrayerGrid rows={rows} loading={loading} error={error?.message} />
+      </div>
+
+      <footer className="text-xs text-slate-500 mt-8">
+        Built with Next.js (App Router) + Tailwind. Uses an API route proxying
+        Aladhan.
       </footer>
     </div>
   );

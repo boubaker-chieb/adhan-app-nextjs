@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { z } from "zod";
 import { to24h, parseTodayAt } from "@/lib/time";
@@ -7,7 +7,7 @@ import type {
   NextPrayerInfo,
   PrayerKey,
   PrayerRow,
-} from "@/types";
+} from "@/types/index";
 
 const TimingsSchema = z.object({
   Fajr: z.string(),
@@ -29,7 +29,7 @@ export function usePrayerTimes({
 }) {
   const [data, setData] = useState<{
     rows: PrayerRow[];
-    nextPrayer: NextPrayerInfo | null;
+    nextPrayer: NextPrayerInfo;
     meta: { timezone: string; hijri: string; readable: string } | null;
   } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,17 +64,26 @@ export function usePrayerTimes({
         const date = parseTodayAt(time);
         return { key, time, date, passed: date.isBefore(now) };
       });
-      const upcoming = rows.find((r) => !r.passed && r.key !== "Sunrise");
-      const nextPrayer: NextPrayerInfo | null = upcoming
-        ? { key: upcoming.key, date: upcoming.date }
-        : {
-            key: "Fajr",
-            date: rows.find((r) => r.key === "Fajr")!.date.add(1, "day"),
-          };
+      const upcoming = rows.find(
+        (r) =>
+          !r.passed &&
+          r.key !== "Sunrise"
+      );
+      const nextPrayer: NextPrayerInfo | null =
+        upcoming && upcoming.key !== "Sunrise"
+          ? { key: upcoming.key as Exclude<PrayerKey, "Sunrise">, date: upcoming.date }
+          : {
+              key: "Fajr",
+              date: rows.find((r) => r.key === "Fajr")!.date.add(1, "day"),
+            };
 
       setData({ rows, nextPrayer, meta: json.meta });
-    } catch (e: any) {
-      setError(e);
+    } catch (e: unknown) {
+      if (e instanceof Error) {
+        setError(e);
+      } else {
+        setError(new Error("Unknown error"));
+      }
     } finally {
       setLoading(false);
     }
